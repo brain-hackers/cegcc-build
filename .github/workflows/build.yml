@@ -46,29 +46,51 @@ jobs:
         run: sudo rm /etc/apt/sources.list.d/github_git-lfs.*
       - name: Install deps
         run: |
+          sudo dpkg --add-architecture arm64
           sudo apt update
-          sudo apt install build-essential bison flex m4 libgmp-dev libmpc-dev libmpfr-dev
-      - name: Build cegcc
-        run: |
-          mkdir build 
-          cd build 
-          ../build.sh -j4
-      - name: Setup releases
-        id: release_name
+          sudo apt install build-essential bison flex m4 libgmp-dev libmpc-dev libmpfr-dev libgmp-dev:arm64 libmpc-dev:arm64 libmpfr-dev:arm64
+      - name: Build cegcc for x86
         run: |
           export DIR=$(pwd)
-          ls -l /opt/cegcc/
+          mkdir build
+          cd build
+          ../build.sh -j4
           cd /opt
-          zip -r $DIR/cegcc.zip cegcc
+          zip -r $DIR/cegcc-x86.zip cegcc
+          rm -rf cegcc
+      - name: Build cegcc for aarch64
+        run: |
+          export DIR=$(pwd)
+          mkdir cross
+          cd cross
+          find /usr/bin/aarch64-linux-gnu-* | sed 's+/usr/bin/aarch64-linux-gnu-++g' | xargs -n1 -I{} ln -s /usr/bin/aarch64-linux-gnu-{} {}
+          export PATH=$(pwd):$PATH
+          cd ..
+          mkdir build
+          cd build
+          ../build.sh -j4 --host=aarch64-linux-gnu
+          cd /opt
+          zip -r $DIR/cegcc-aarch64.zip cegcc
       - name: Generate archive name
         id: archive_name
-        run: echo ::set-output name=name::cegcc-${GITHUB_REF/refs\/*s\//}
-      - name: Upload cegcc.zip
+        run: |
+          echo ::set-output name=name_x86::cegcc-x86-${GITHUB_REF/refs\/*s\//}
+          echo ::set-output name=name_aarch64::cegcc-aarch64-${GITHUB_REF/refs\/*s\//}
+      - name: Upload cegcc-x86.zip
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: cegcc.zip
-          asset_name: ${{ steps.archive_name.outputs.name }}.zip
+          asset_path: cegcc-x86.zip
+          asset_name: ${{ steps.archive_name.outputs.name_x86 }}.zip
+          asset_content_type: application/zip
+      - name: Upload cegcc-aarch64.zip
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: cegcc-aarch64.zip
+          asset_name: ${{ steps.archive_name.outputs.name_aarch64 }}.zip
           asset_content_type: application/zip
