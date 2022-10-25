@@ -46,29 +46,69 @@ jobs:
         run: sudo rm /etc/apt/sources.list.d/github_git-lfs.*
       - name: Install deps
         run: |
+          sudo sed -i 's+^deb http://azure+deb [arch=amd64] http://azure+g' /etc/apt/sources.list
+          cat <<EOF >> aarch64.list
+            deb [arch=arm64] http://ports.ubuntu.com/ focal main restricted
+            deb [arch=arm64] http://ports.ubuntu.com/ focal-updates main restricted
+            deb [arch=arm64] http://ports.ubuntu.com/ focal universe
+            deb [arch=arm64] http://ports.ubuntu.com/ focal-updates universe
+            deb [arch=arm64] http://ports.ubuntu.com/ focal multiverse
+            deb [arch=arm64] http://ports.ubuntu.com/ focal-updates multiverse
+            deb [arch=arm64] http://ports.ubuntu.com/ focal-backports main restricted universe multiverse
+          EOF
+          sudo mv aarch64.list /etc/apt/sources.list.d/
+          sudo dpkg --add-architecture arm64
           sudo apt update
-          sudo apt install build-essential bison flex m4 libgmp-dev libmpc-dev libmpfr-dev
-      - name: Build cegcc
-        run: |
-          mkdir build 
-          cd build 
-          ../build.sh -j4
-      - name: Setup releases
-        id: release_name
+          sudo apt install build-essential bison flex m4 libgmp-dev libmpc-dev libmpfr-dev \
+                           gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libgmp-dev:arm64 libmpc-dev:arm64 libmpfr-dev:arm64 qemu-user-static
+      - name: Build cegcc for x86_64
         run: |
           export DIR=$(pwd)
-          ls -l /opt/cegcc/
+          mkdir build
+          cd build
+          ../build.sh -j4
+          cd /opt/cegcc
+          find . | xargs file | grep "not stripped" | grep -oE '^[^:]+' | xargs strip
           cd /opt
-          zip -r $DIR/cegcc.zip cegcc
+          zip -r $DIR/cegcc-x86_64.zip cegcc
+          rm -rf cegcc
+      - name: Build cegcc for aarch64
+        run: |
+          export DIR=$(pwd)
+          mkdir cross
+          cd cross
+          find /usr/bin/aarch64-linux-gnu-* | sed 's+/usr/bin/aarch64-linux-gnu-++g' | xargs -n1 -I{} ln -s /usr/bin/aarch64-linux-gnu-{} {}
+          ln -s ../build/gcc-bootstrap/gcc/xgcc arm-mingw32ce-gcc # dirty workaround to fix "command not found"
+          export PATH=$(pwd):$PATH
+          cd ..
+          rm -rf build
+          mkdir build
+          cd build
+          ../build.sh -j4 --host=aarch64-linux-gnu
+          cd /opt/cegcc
+          find . | xargs file | grep "not stripped" | grep -oE '^[^:]+' | xargs /usr/bin/aarch64-linux-gnu-strip
+          cd /opt
+          zip -r $DIR/cegcc-aarch64.zip cegcc
       - name: Generate archive name
         id: archive_name
-        run: echo ::set-output name=name::cegcc-${GITHUB_REF/refs\/*s\//}
-      - name: Upload cegcc.zip
+        run: |
+          echo ::set-output name=name_x86_64::cegcc-x86_64-${GITHUB_REF/refs\/*s\//}
+          echo ::set-output name=name_aarch64::cegcc-aarch64-${GITHUB_REF/refs\/*s\//}
+      - name: Upload cegcc-x86_64.zip
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: cegcc.zip
-          asset_name: ${{ steps.archive_name.outputs.name }}.zip
+          asset_path: cegcc-x86_64.zip
+          asset_name: ${{ steps.archive_name.outputs.name_x86_64 }}.zip
+          asset_content_type: application/zip
+      - name: Upload cegcc-aarch64.zip
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: cegcc-aarch64.zip
+          asset_name: ${{ steps.archive_name.outputs.name_aarch64 }}.zip
           asset_content_type: application/zip
