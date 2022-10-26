@@ -216,6 +216,7 @@ function configure_module()
 function configure_host_module()
 {
     configure_module "$@" \
+	--build=$(gcc -dumpmachine) \
 	--host=${HOST} \
 	--target=${TARGET}
 }
