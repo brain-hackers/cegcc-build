@@ -9,4 +9,4 @@
 	url = ../../MaxKellermann/gcc
 [submodule "mingw"]
 	path = mingw
-	url = ../../MaxKellermann/mingwrt
+	url = ../../brain-hackers/mingwrt
