@@ -34,7 +34,7 @@ jobs:
 
   build:
     name: Build
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     needs: [create_release]
     steps:
       - uses: actions/checkout@v2
@@ -42,21 +42,17 @@ jobs:
           submodules: true
       - name: Make /opt writable and create dir
         run: sudo chown "$(whoami):$(whoami)" /opt && mkdir /opt/cegcc
-      - name: Workaround for apt update failure
-        run: sudo rm /etc/apt/sources.list.d/github_git-lfs.*
       - name: Install deps
         run: |
-          sudo sed -i 's+^deb http://azure+deb [arch=amd64] http://azure+g' /etc/apt/sources.list
-          cat <<EOF >> aarch64.list
-            deb [arch=arm64] http://ports.ubuntu.com/ focal main restricted
-            deb [arch=arm64] http://ports.ubuntu.com/ focal-updates main restricted
-            deb [arch=arm64] http://ports.ubuntu.com/ focal universe
-            deb [arch=arm64] http://ports.ubuntu.com/ focal-updates universe
-            deb [arch=arm64] http://ports.ubuntu.com/ focal multiverse
-            deb [arch=arm64] http://ports.ubuntu.com/ focal-updates multiverse
-            deb [arch=arm64] http://ports.ubuntu.com/ focal-backports main restricted universe multiverse
+          sudo sed -i 's/^Types: deb/Architectures: amd64\nTypes: deb/' /etc/apt/sources.list.d/ubuntu.sources
+          sudo tee /etc/apt/sources.list.d/arm64.sources <<EOF
+          Enabled: yes
+          Types: deb
+          URIs: http://ports.ubuntu.com/
+          Suites: noble noble-updates noble-backports
+          Components: main restricted universe multiverse
+          Architectures: arm64
           EOF
-          sudo mv aarch64.list /etc/apt/sources.list.d/
           sudo dpkg --add-architecture arm64
           sudo apt update
           sudo apt install build-essential bison flex m4 libgmp-dev libmpc-dev libmpfr-dev \
