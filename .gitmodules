@@ -6,7 +6,7 @@
 	url = ../../MaxKellermann/binutils-gdb
 [submodule "gcc"]
 	path = gcc
-	url = ../../MaxKellermann/gcc
+	url = ../../brain-hackers/gcc
 [submodule "mingw"]
 	path = mingw
 	url = ../../brain-hackers/mingwrt
